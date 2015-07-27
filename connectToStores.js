@@ -29,7 +29,11 @@ function createComponent(Component, stores, getStateFromStores, customContextTyp
                 this.context.getStore(Store).removeChangeListener(this._onStoreChange);
             }, this);
         },
-        getStateFromStores: function () {
+        componentWillReceiveProps: function componentWillReceiveProps(nextProps){
+            this.setState(this.getStateFromStores(nextProps));
+        },
+        getStateFromStores: function (props) {
+            props = props || this.props;
             if ('function' !== typeof getStateFromStores) {
                 //@TODO remove this branch in next minor
                 if ('production' !== process.env.NODE_ENV) {
@@ -42,7 +46,7 @@ function createComponent(Component, stores, getStateFromStores, customContextTyp
                 Object.keys(getStateFromStores).forEach(function (storeName) {
                     var stateGetter = getStateFromStores[storeName];
                     var store = this.context.getStore(storeName);
-                    objectAssign(state, stateGetter(store, this.props));
+                    objectAssign(state, stateGetter(store, props));
                 }, this);
                 return state;
             }
@@ -53,29 +57,35 @@ function createComponent(Component, stores, getStateFromStores, customContextTyp
             stores.forEach(function (store) {
                 var storeName = store.storeName || store.name || store;
                 if ('production' !== process.env.NODE_ENV) {
-                    Object.defineProperty(storeInstances, storeName, {
-                        get: function () {
-                            console.warn(componentName + '\'s connectToStores ' +
-                                'state getter is trying to access ' + storeName +
-                                '. connectToStore no longer passes the ' +
-                                'stores to the state getter. The state getter ' +
-                                'signature is now (context, props) and you ' +
-                                'should access the store using ' +
-                                '`context.getStore(' + storeName + ')`. See ' +
-                                'https://github.com/yahoo/fluxible/pull/124 ' +
-                                'for more details on this change.');
-                            return context.getStore(store);
-                        }
-                    });
+                    try {
+                        Object.defineProperty(storeInstances, storeName, {
+                            get: function () {
+                                console.warn(componentName + '\'s connectToStores ' +
+                                    'state getter is trying to access ' + storeName +
+                                    '. connectToStore no longer passes the ' +
+                                    'stores to the state getter. The state getter ' +
+                                    'signature is now (context, props) and you ' +
+                                    'should access the store using ' +
+                                    '`context.getStore(' + storeName + ')`. See ' +
+                                    'https://github.com/yahoo/fluxible/pull/124 ' +
+                                    'for more details on this change.');
+                                return context.getStore(store);
+                            }
+                        });
+                    } catch (e) {
+                        // https://github.com/es-shims/es5-shim#may-fail
+                        // Object.defineProperty will fail on IE8
+                        storeInstances[storeName] = context.getStore(store);
+                    }
                 } else {
                     storeInstances[storeName] = this.context.getStore(store);
                 }
             }, this);
             var mergedContext = objectAssign(storeInstances, this.context);
-            return getStateFromStores(mergedContext, this.props);
+            return getStateFromStores(mergedContext, props);
 
             // @TODO just do this in next minor version
-            //return getStateFromStores(this.context, this.props);
+            //return getStateFromStores(this.context, props);
         },
         _onStoreChange: function onStoreChange() {
             if (this.isMounted()) {
@@ -128,12 +138,13 @@ function createComponent(Component, stores, getStateFromStores, customContextTyp
  * @returns {React.Component} or {Function} if using decorator pattern
  */
 module.exports = function connectToStores(Component, stores, getStateFromStores) {
+
     // support decorator pattern
     if (arguments.length === 2) {
-        stores = arguments[0];
-        getStateFromStores = arguments[1];
+        var _stores = Component;
+        var _getStateFromStores = stores;
         return function connectToStoresDecorator(ComponentToDecorate) {
-            return createComponent(ComponentToDecorate, stores, getStateFromStores);
+            return createComponent(ComponentToDecorate, _stores, _getStateFromStores);
         };
     }
 
