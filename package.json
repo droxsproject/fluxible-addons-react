@@ -31,7 +31,7 @@
     "mocha": "^2.0.1",
     "mockery": "^1.4.0",
     "pre-commit": "^1.0.7",
-    "react": "0.13.x"
+    "react": "^0.13.3"
   },
   "author": "Michael Ridgway <mridgway@yahoo-inc.com>",
   "license": "BSD-3-Clause"
